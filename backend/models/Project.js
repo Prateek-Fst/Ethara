@@ -42,16 +42,25 @@ const projectSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+const idOf = (v) => {
+  if (!v) return '';
+  if (typeof v === 'string') return v;
+  if (v._id) return v._id.toString();
+  return v.toString();
+};
+
 projectSchema.methods.isMember = function (userId) {
+  const uid = idOf(userId);
   return (
-    this.owner.toString() === userId.toString() ||
-    this.members.some((m) => m.user.toString() === userId.toString())
+    idOf(this.owner) === uid ||
+    this.members.some((m) => idOf(m.user) === uid)
   );
 };
 
 projectSchema.methods.isAdmin = function (userId) {
-  if (this.owner.toString() === userId.toString()) return true;
-  const member = this.members.find((m) => m.user.toString() === userId.toString());
+  const uid = idOf(userId);
+  if (idOf(this.owner) === uid) return true;
+  const member = this.members.find((m) => idOf(m.user) === uid);
   return member && member.role === 'Admin';
 };
 
