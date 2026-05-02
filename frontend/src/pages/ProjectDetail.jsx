@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import TaskCard from '../components/TaskCard';
 
 export default function ProjectDetail() {
   const { id } = useParams();
   const { user } = useAuth();
+  const toast = useToast();
+  const navigate = useNavigate();
   const [project, setProject] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -70,7 +73,7 @@ export default function ProjectDetail() {
       setShowTaskForm(false);
       await load();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to create task');
+      toast.error(err.response?.data?.message || 'Failed to create task');
     }
   };
 
@@ -80,7 +83,7 @@ export default function ProjectDetail() {
       await api.put(`/tasks/${taskId}`, { status });
       await load();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to update');
+      toast.error(err.response?.data?.message || 'Failed to update');
       await load();
     }
   };
@@ -115,7 +118,7 @@ export default function ProjectDetail() {
     const task = tasks.find((t) => t._id === taskId);
     if (!task || task.status === col) return;
     if (!canChangeStatus(task)) {
-      alert('You cannot change the status of this task.');
+      toast.error('You cannot change the status of this task.');
       return;
     }
     await updateStatus(taskId, col);
@@ -125,9 +128,10 @@ export default function ProjectDetail() {
     if (!confirm('Delete this task?')) return;
     try {
       await api.delete(`/tasks/${taskId}`);
+      toast.success('Task deleted');
       await load();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to delete');
+      toast.error(err.response?.data?.message || 'Failed to delete');
     }
   };
 
@@ -139,7 +143,7 @@ export default function ProjectDetail() {
       setMemberRole('Member');
       await load();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to add member');
+      toast.error(err.response?.data?.message || 'Failed to add member');
     }
   };
 
@@ -147,9 +151,10 @@ export default function ProjectDetail() {
     if (!confirm(`Delete the project "${project.name}" and all its tasks? This cannot be undone.`)) return;
     try {
       await api.delete(`/projects/${id}`);
-      window.location.href = '/projects';
+      toast.success('Project deleted');
+      navigate('/projects');
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to delete project');
+      toast.error(err.response?.data?.message || 'Failed to delete project');
     }
   };
 
@@ -159,7 +164,7 @@ export default function ProjectDetail() {
       await api.delete(`/projects/${id}/members/${userId}`);
       await load();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to remove member');
+      toast.error(err.response?.data?.message || 'Failed to remove member');
     }
   };
 
@@ -168,7 +173,7 @@ export default function ProjectDetail() {
       await api.put(`/projects/${id}/members/${userId}`, { role });
       await load();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to change role');
+      toast.error(err.response?.data?.message || 'Failed to change role');
     }
   };
 

@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import TaskCard from '../components/TaskCard';
 
 export default function Tasks() {
   const { user } = useAuth();
+  const toast = useToast();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -37,7 +39,7 @@ export default function Tasks() {
       await api.put(`/tasks/${taskId}`, { status });
       await load();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to update');
+      toast.error(err.response?.data?.message || 'Failed to update');
     }
   };
 
@@ -47,7 +49,7 @@ export default function Tasks() {
       await api.delete(`/tasks/${taskId}`);
       await load();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to delete');
+      toast.error(err.response?.data?.message || 'Failed to delete');
     }
   };
 
@@ -95,6 +97,7 @@ export default function Tasks() {
         <div className="loading">Loading…</div>
       ) : tasks.length === 0 ? (
         <div className="empty-state">
+          <span className="empty-emoji">🗂️</span>
           <h3>No tasks found</h3>
           <p>Try changing filters or create a task in a project.</p>
         </div>

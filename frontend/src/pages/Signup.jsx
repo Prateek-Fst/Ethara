@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 export default function Signup() {
   const [name, setName] = useState('');
@@ -9,6 +10,7 @@ export default function Signup() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const { signup } = useAuth();
+  const toast = useToast();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -20,7 +22,12 @@ export default function Signup() {
     }
     setSubmitting(true);
     try {
-      await signup(name, email, password);
+      const u = await signup(name, email, password);
+      toast.success(
+        u.role === 'Admin'
+          ? `Welcome, ${u.name}! You're the Global Admin.`
+          : `Welcome, ${u.name}!`
+      );
       navigate('/');
     } catch (err) {
       const msg = err.response?.data?.message

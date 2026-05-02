@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api';
+import { SkeletonStatGrid } from '../components/Skeleton';
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
@@ -22,7 +23,17 @@ export default function Dashboard() {
     load();
   }, []);
 
-  if (loading) return <div className="loading">Loading dashboard…</div>;
+  if (loading) {
+    return (
+      <div className="page">
+        <div className="page-header">
+          <h1>Dashboard</h1>
+          <p className="muted">Loading your overview…</p>
+        </div>
+        <SkeletonStatGrid />
+      </div>
+    );
+  }
   if (error) return <div className="alert alert-error">{error}</div>;
 
   const { stats, isGlobalAdmin, projects, tasksPerUser = [], myTasks, overdueTasks, recentTasks } = data;
@@ -30,11 +41,11 @@ export default function Dashboard() {
   return (
     <div className="page">
       <div className="page-header">
-        <h1>Dashboard{isGlobalAdmin ? ' — Global Admin' : ''}</h1>
+        <h1>{isGlobalAdmin ? 'Workspace Dashboard' : 'Dashboard'}</h1>
         <p className="muted">
           {isGlobalAdmin
-            ? 'Showing stats across every project and user in the system.'
-            : 'An overview of your projects and tasks.'}
+            ? 'Aggregate stats across every project and user in the system.'
+            : 'A snapshot of your projects and tasks.'}
         </p>
       </div>
 
@@ -78,10 +89,10 @@ export default function Dashboard() {
         <section className="dash-card">
           <div className="dash-card-header">
             <h3>Overdue</h3>
-            <span className="muted">{overdueTasks.length} task{overdueTasks.length === 1 ? '' : 's'}</span>
+            <span className="muted small">{overdueTasks.length} task{overdueTasks.length === 1 ? '' : 's'}</span>
           </div>
           {overdueTasks.length === 0 ? (
-            <p className="muted">Nothing overdue. </p>
+            <p className="muted">All caught up. </p>
           ) : (
             <ul className="dash-list">
               {overdueTasks.map((t) => (
@@ -120,7 +131,7 @@ export default function Dashboard() {
         <section className="dash-card">
           <div className="dash-card-header">
             <h3>Tasks per User</h3>
-            <span className="muted">{tasksPerUser.length} {tasksPerUser.length === 1 ? 'person' : 'people'}</span>
+            <span className="muted small">{tasksPerUser.length} {tasksPerUser.length === 1 ? 'person' : 'people'}</span>
           </div>
           {tasksPerUser.length === 0 ? (
             <p className="muted">No tasks yet.</p>
@@ -189,9 +200,32 @@ function StatCard({ label, value, icon, tone }) {
     <div className={`stat-card stat-${tone}`}>
       <div className="stat-icon">{icon}</div>
       <div>
-        <div className="stat-value">{value}</div>
+        <AnimatedNumber value={value} />
         <div className="stat-label">{label}</div>
       </div>
     </div>
   );
+}
+
+function AnimatedNumber({ value }) {
+  const [display, setDisplay] = useState(0);
+  useEffect(() => {
+    if (typeof value !== 'number') { setDisplay(value || 0); return; }
+    const start = display;
+    const diff = value - start;
+    if (diff === 0) return;
+    const duration = 600;
+    const startTime = performance.now();
+    let raf;
+    const step = (now) => {
+      const t = Math.min(1, (now - startTime) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setDisplay(Math.round(start + diff * eased));
+      if (t < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+  return <div className="stat-value">{display}</div>;
 }

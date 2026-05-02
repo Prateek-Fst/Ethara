@@ -2,9 +2,12 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { SkeletonCardGrid } from '../components/Skeleton';
 
 export default function Projects() {
   const { user } = useAuth();
+  const toast = useToast();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -24,9 +27,7 @@ export default function Projects() {
     }
   };
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
 
   const create = async (e) => {
     e.preventDefault();
@@ -34,6 +35,7 @@ export default function Projects() {
     setError('');
     try {
       await api.post('/projects', { name, description });
+      toast.success(`Project "${name}" created`);
       setName('');
       setDescription('');
       setShowForm(false);
@@ -45,24 +47,23 @@ export default function Projects() {
     }
   };
 
-  const remove = async (id) => {
-    if (!confirm('Delete this project and all its tasks?')) return;
+  const remove = async (id, projectName) => {
+    if (!confirm(`Delete "${projectName}" and all its tasks? This cannot be undone.`)) return;
     try {
       await api.delete(`/projects/${id}`);
+      toast.success('Project deleted');
       await load();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to delete');
+      toast.error(err.response?.data?.message || 'Failed to delete');
     }
   };
-
-  if (loading) return <div className="loading">Loading projects…</div>;
 
   return (
     <div className="page">
       <div className="page-header row-between">
         <div>
           <h1>Projects</h1>
-          <p className="muted">Create projects, invite teammates, track progress</p>
+          <p className="muted">Create projects, invite teammates, track progress.</p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
           {showForm ? 'Cancel' : '+ New Project'}
@@ -73,14 +74,14 @@ export default function Projects() {
         <form className="card form-card" onSubmit={create}>
           {error && <div className="alert alert-error">{error}</div>}
           <label>Project name</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} required maxLength={100} />
+          <input value={name} onChange={(e) => setName(e.target.value)} required maxLength={100} placeholder="e.g. Q3 Launch" autoFocus />
           <label>Description</label>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             maxLength={1000}
             rows={3}
-            placeholder="What is this project about?"
+            placeholder="What's this project about?"
           />
           <button className="btn btn-primary" disabled={submitting}>
             {submitting ? 'Creating…' : 'Create Project'}
@@ -88,10 +89,13 @@ export default function Projects() {
         </form>
       )}
 
-      {projects.length === 0 ? (
+      {loading ? (
+        <SkeletonCardGrid count={4} />
+      ) : projects.length === 0 ? (
         <div className="empty-state">
+          <span className="empty-emoji">📂</span>
           <h3>No projects yet</h3>
-          <p>Create your first project to start tracking tasks.</p>
+          <p>Create your first project to start tracking tasks with your team.</p>
         </div>
       ) : (
         <div className="projects-grid">
@@ -103,9 +107,7 @@ export default function Projects() {
             return (
               <div key={p._id} className="project-card">
                 <div className="project-card-header">
-                  <h3>
-                    <Link to={`/projects/${p._id}`}>{p.name}</Link>
-                  </h3>
+                  <h3><Link to={`/projects/${p._id}`}>{p.name}</Link></h3>
                   <span className={`badge badge-${p.status.toLowerCase()}`}>{p.status}</span>
                 </div>
                 {p.description && <p className="muted">{p.description}</p>}
@@ -122,7 +124,7 @@ export default function Projects() {
                 <div className="project-actions">
                   <Link to={`/projects/${p._id}`} className="btn btn-secondary btn-sm">Open</Link>
                   {canDelete && (
-                    <button className="btn btn-danger btn-sm" onClick={() => remove(p._id)}>
+                    <button className="btn btn-danger btn-sm" onClick={() => remove(p._id, p.name)}>
                       Delete
                     </button>
                   )}
