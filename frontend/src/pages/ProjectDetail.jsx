@@ -21,6 +21,8 @@ export default function ProjectDetail() {
     dueDate: ''
   });
   const [showTaskForm, setShowTaskForm] = useState(false);
+  const [draggingTaskId, setDraggingTaskId] = useState(null);
+  const [dragOverCol, setDragOverCol] = useState(null);
 
   const [memberEmail, setMemberEmail] = useState('');
   const [memberRole, setMemberRole] = useState('Member');
@@ -70,12 +72,50 @@ export default function ProjectDetail() {
   };
 
   const updateStatus = async (taskId, status) => {
+    setTasks((prev) => prev.map((t) => (t._id === taskId ? { ...t, status } : t)));
     try {
       await api.put(`/tasks/${taskId}`, { status });
       await load();
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to update');
+      await load();
     }
+  };
+
+  const handleDragStart = (taskId) => (e) => {
+    setDraggingTaskId(taskId);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', taskId);
+  };
+
+  const handleDragEnd = () => {
+    setDraggingTaskId(null);
+    setDragOverCol(null);
+  };
+
+  const handleColumnDragOver = (col) => (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverCol !== col) setDragOverCol(col);
+  };
+
+  const handleColumnDragLeave = (col) => () => {
+    if (dragOverCol === col) setDragOverCol(null);
+  };
+
+  const handleColumnDrop = (col) => async (e) => {
+    e.preventDefault();
+    const taskId = e.dataTransfer.getData('text/plain') || draggingTaskId;
+    setDraggingTaskId(null);
+    setDragOverCol(null);
+    if (!taskId) return;
+    const task = tasks.find((t) => t._id === taskId);
+    if (!task || task.status === col) return;
+    if (!canChangeStatus(task)) {
+      alert('You cannot change the status of this task.');
+      return;
+    }
+    await updateStatus(taskId, col);
   };
 
   const deleteTask = async (taskId) => {
@@ -221,16 +261,25 @@ export default function ProjectDetail() {
             </form>
           )}
 
+          <p className="muted small" style={{ marginBottom: 8 }}>
+            Tip: drag a task card between columns to change its status.
+          </p>
           <div className="board">
             {['Todo', 'In Progress', 'Done'].map((col) => (
-              <div key={col} className="board-col">
+              <div
+                key={col}
+                className={`board-col ${dragOverCol === col ? 'drag-over' : ''}`}
+                onDragOver={handleColumnDragOver(col)}
+                onDragLeave={handleColumnDragLeave(col)}
+                onDrop={handleColumnDrop(col)}
+              >
                 <div className="board-col-header">
                   <h3>{col}</h3>
                   <span className="count">{grouped[col].length}</span>
                 </div>
                 <div className="board-col-body">
                   {grouped[col].length === 0 ? (
-                    <p className="muted small">No tasks</p>
+                    <p className="muted small empty-col">Drop tasks here</p>
                   ) : (
                     grouped[col].map((t) => (
                       <TaskCard
@@ -240,6 +289,9 @@ export default function ProjectDetail() {
                         onDelete={deleteTask}
                         canEdit={canEditTask(t)}
                         canChangeStatus={canChangeStatus(t)}
+                        draggable={canChangeStatus(t)}
+                        onDragStart={handleDragStart(t._id)}
+                        onDragEnd={handleDragEnd}
                       />
                     ))
                   )}

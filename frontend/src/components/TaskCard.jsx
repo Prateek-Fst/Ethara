@@ -12,12 +12,17 @@ const priorityColors = {
   High: 'priority-high'
 };
 
-export default function TaskCard({ task, onStatusChange, onDelete, canEdit, canChangeStatus }) {
+export default function TaskCard({ task, onStatusChange, onDelete, canEdit, canChangeStatus, draggable, onDragStart, onDragEnd }) {
   const isOverdue = task.dueDate && task.status !== 'Done' && new Date(task.dueDate) < new Date();
   const due = task.dueDate ? new Date(task.dueDate).toLocaleDateString() : null;
 
   return (
-    <div className={`task-card ${isOverdue ? 'overdue' : ''}`}>
+    <div
+      className={`task-card ${isOverdue ? 'overdue' : ''} ${draggable ? 'draggable' : ''}`}
+      draggable={!!draggable}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+    >
       <div className="task-header">
         <span className={`priority-dot ${priorityColors[task.priority]}`} title={task.priority} />
         <h4 className="task-title">{task.title}</h4>
