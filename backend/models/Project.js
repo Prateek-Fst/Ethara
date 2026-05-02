@@ -64,4 +64,26 @@ projectSchema.methods.isAdmin = function (userId) {
   return member && member.role === 'Admin';
 };
 
+projectSchema.methods.isOwner = function (userId) {
+  return idOf(this.owner) === idOf(userId);
+};
+
+projectSchema.methods.canView = function (user) {
+  if (!user) return false;
+  if (user.role === 'Admin') return true;
+  return this.isMember(user._id);
+};
+
+projectSchema.methods.canActAsAdmin = function (user) {
+  if (!user) return false;
+  if (user.role === 'Admin') return true;
+  return this.isAdmin(user._id);
+};
+
+projectSchema.methods.canDeleteProject = function (user) {
+  if (!user) return false;
+  if (user.role === 'Admin') return true;
+  return this.isOwner(user._id);
+};
+
 module.exports = mongoose.model('Project', projectSchema);

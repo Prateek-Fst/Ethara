@@ -13,14 +13,14 @@ const loadProject = async (req, res, next) => {
 };
 
 const requireProjectMember = (req, res, next) => {
-  if (!req.project.isMember(req.user._id)) {
+  if (!req.project.canView(req.user)) {
     return res.status(403).json({ message: 'Not a project member' });
   }
   next();
 };
 
 const requireProjectAdmin = (req, res, next) => {
-  if (!req.project.isAdmin(req.user._id)) {
+  if (!req.project.canActAsAdmin(req.user)) {
     return res.status(403).json({ message: 'Project admin access required' });
   }
   next();

@@ -25,22 +25,29 @@ export default function Dashboard() {
   if (loading) return <div className="loading">Loading dashboard…</div>;
   if (error) return <div className="alert alert-error">{error}</div>;
 
-  const { stats, projects, tasksPerUser = [], myTasks, overdueTasks, recentTasks } = data;
+  const { stats, isGlobalAdmin, projects, tasksPerUser = [], myTasks, overdueTasks, recentTasks } = data;
 
   return (
     <div className="page">
       <div className="page-header">
-        <h1>Dashboard</h1>
-        <p className="muted">An overview of your projects and tasks</p>
+        <h1>Dashboard{isGlobalAdmin ? ' — Global Admin' : ''}</h1>
+        <p className="muted">
+          {isGlobalAdmin
+            ? 'Showing stats across every project and user in the system.'
+            : 'An overview of your projects and tasks.'}
+        </p>
       </div>
 
       <div className="stats-grid">
-        <StatCard label="Projects" value={stats.totalProjects} icon="📁" tone="blue" />
+        <StatCard label={isGlobalAdmin ? 'All Projects' : 'My Projects'} value={stats.totalProjects} icon="📁" tone="blue" />
         <StatCard label="Total Tasks" value={stats.totalTasks} icon="📝" tone="purple" />
         <StatCard label="In Progress" value={stats.inProgress} icon="⚡" tone="amber" />
         <StatCard label="Completed" value={stats.done} icon="✅" tone="green" />
         <StatCard label="Overdue" value={stats.overdue} icon="⚠️" tone="red" />
         <StatCard label="My Open Tasks" value={stats.myOpenTasks} icon="👤" tone="teal" />
+        {isGlobalAdmin && (
+          <StatCard label="Total Users" value={stats.totalUsers} icon="👥" tone="purple" />
+        )}
       </div>
 
       <div className="dash-grid">

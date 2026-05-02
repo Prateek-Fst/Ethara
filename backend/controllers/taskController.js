@@ -1,6 +1,7 @@
 const { validationResult } = require('express-validator');
 const Task = require('../models/Task');
 const Project = require('../models/Project');
+const User = require('../models/User');
 
 exports.createTask = async (req, res) => {
   const errors = validationResult(req);
@@ -10,8 +11,8 @@ exports.createTask = async (req, res) => {
     const { title, description, project: projectId, assignedTo, status, priority, dueDate } = req.body;
     const project = await Project.findById(projectId);
     if (!project) return res.status(404).json({ message: 'Project not found' });
-    if (!project.isMember(req.user._id)) {
-      return res.status(403).json({ message: 'Not a project member' });
+    if (!project.canActAsAdmin(req.user)) {
+      return res.status(403).json({ message: 'Only project admins can create tasks' });
     }
     if (assignedTo && !project.isMember(assignedTo)) {
       return res.status(400).json({ message: 'Assignee must be a project member' });
@@ -38,17 +39,18 @@ exports.createTask = async (req, res) => {
 
 exports.getTasks = async (req, res) => {
   try {
+    const isGlobalAdmin = req.user.role === 'Admin';
     const { project: projectId, status, assignedTo, priority, mine } = req.query;
     const filter = {};
 
     if (projectId) {
       const project = await Project.findById(projectId);
       if (!project) return res.status(404).json({ message: 'Project not found' });
-      if (!project.isMember(req.user._id)) {
+      if (!project.canView(req.user)) {
         return res.status(403).json({ message: 'Not a project member' });
       }
       filter.project = projectId;
-    } else {
+    } else if (!isGlobalAdmin) {
       const userProjects = await Project.find({
         $or: [{ owner: req.user._id }, { 'members.user': req.user._id }]
       }).select('_id');
@@ -79,7 +81,7 @@ exports.getTask = async (req, res) => {
       .populate('project', 'name owner members');
     if (!task) return res.status(404).json({ message: 'Task not found' });
     const project = await Project.findById(task.project._id);
-    if (!project.isMember(req.user._id)) {
+    if (!project.canView(req.user)) {
       return res.status(403).json({ message: 'Not a project member' });
     }
     res.json({ task });
@@ -94,23 +96,29 @@ exports.updateTask = async (req, res) => {
     if (!task) return res.status(404).json({ message: 'Task not found' });
 
     const project = await Project.findById(task.project);
-    if (!project.isMember(req.user._id)) {
+    if (!project.canView(req.user)) {
       return res.status(403).json({ message: 'Not a project member' });
     }
 
-    const isAssignee = task.assignedTo && task.assignedTo.toString() === req.user._id.toString();
-    const isAdmin = project.isAdmin(req.user._id);
-    const isCreator = task.createdBy.toString() === req.user._id.toString();
+    const canManage = project.canActAsAdmin(req.user);
+    const isAssignee =
+      task.assignedTo && task.assignedTo.toString() === req.user._id.toString();
 
     const { title, description, assignedTo, status, priority, dueDate } = req.body;
 
-    if ((title !== undefined || description !== undefined || dueDate !== undefined ||
-         priority !== undefined || assignedTo !== undefined) && !isAdmin && !isCreator) {
-      return res.status(403).json({ message: 'Only project admins or task creator can edit task details' });
+    const editsDetails =
+      title !== undefined ||
+      description !== undefined ||
+      dueDate !== undefined ||
+      priority !== undefined ||
+      assignedTo !== undefined;
+
+    if (editsDetails && !canManage) {
+      return res.status(403).json({ message: 'Only project admins can edit task details' });
     }
 
-    if (status !== undefined && !isAssignee && !isAdmin && !isCreator) {
-      return res.status(403).json({ message: 'Only assignee, creator, or admin can change status' });
+    if (status !== undefined && !canManage && !isAssignee) {
+      return res.status(403).json({ message: 'Only the assignee or a project admin can change status' });
     }
 
     if (assignedTo !== undefined) {
@@ -143,10 +151,12 @@ exports.deleteTask = async (req, res) => {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ message: 'Task not found' });
     const project = await Project.findById(task.project);
-    const isAdmin = project.isAdmin(req.user._id);
-    const isCreator = task.createdBy.toString() === req.user._id.toString();
-    if (!isAdmin && !isCreator) {
-      return res.status(403).json({ message: 'Only project admin or task creator can delete' });
+    const isGlobalAdmin = req.user.role === 'Admin';
+    const isOwner = project.isOwner(req.user._id);
+    if (!isGlobalAdmin && !isOwner) {
+      return res.status(403).json({
+        message: 'Only the project owner or a global Admin can delete tasks'
+      });
     }
     await task.deleteOne();
     res.json({ message: 'Task deleted' });
@@ -157,11 +167,14 @@ exports.deleteTask = async (req, res) => {
 
 exports.getDashboard = async (req, res) => {
   try {
-    const userProjects = await Project.find({
-      $or: [{ owner: req.user._id }, { 'members.user': req.user._id }]
-    }).select('_id name');
+    const isGlobalAdmin = req.user.role === 'Admin';
+    const userProjectsFilter = isGlobalAdmin
+      ? {}
+      : { $or: [{ owner: req.user._id }, { 'members.user': req.user._id }] };
 
+    const userProjects = await Project.find(userProjectsFilter).select('_id name');
     const projectIds = userProjects.map((p) => p._id);
+
     const allTasks = await Task.find({ project: { $in: projectIds } })
       .populate('assignedTo', 'name email')
       .populate('project', 'name')
@@ -186,6 +199,10 @@ exports.getDashboard = async (req, res) => {
       myOpenTasks: myTasks.filter((t) => t.status !== 'Done').length
     };
 
+    if (isGlobalAdmin) {
+      stats.totalUsers = await User.countDocuments();
+    }
+
     const perUserMap = new Map();
     for (const t of allTasks) {
       const key = t.assignedTo ? t.assignedTo._id.toString() : 'unassigned';
@@ -205,6 +222,7 @@ exports.getDashboard = async (req, res) => {
 
     res.json({
       stats,
+      isGlobalAdmin,
       projects: userProjects,
       tasksPerUser,
       myTasks: myTasks.slice(0, 10),

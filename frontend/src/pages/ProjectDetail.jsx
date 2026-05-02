@@ -50,9 +50,12 @@ export default function ProjectDetail() {
   if (error) return <div className="alert alert-error">{error}</div>;
   if (!project) return null;
 
+  const isGlobalAdmin = user.role === 'Admin';
   const isOwner = project.owner._id === user._id;
   const memberRecord = project.members.find((m) => m.user._id === user._id);
-  const isProjectAdmin = isOwner || (memberRecord && memberRecord.role === 'Admin');
+  const isProjectAdmin = isGlobalAdmin || isOwner || (memberRecord && memberRecord.role === 'Admin');
+  const canDeleteProject = isOwner || isGlobalAdmin;
+  const canDeleteTask = isOwner || isGlobalAdmin;
 
   const createTask = async (e) => {
     e.preventDefault();
@@ -140,6 +143,16 @@ export default function ProjectDetail() {
     }
   };
 
+  const handleDeleteProject = async () => {
+    if (!confirm(`Delete the project "${project.name}" and all its tasks? This cannot be undone.`)) return;
+    try {
+      await api.delete(`/projects/${id}`);
+      window.location.href = '/projects';
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to delete project');
+    }
+  };
+
   const removeMember = async (userId) => {
     if (!confirm('Remove this member from the project?')) return;
     try {
@@ -167,11 +180,9 @@ export default function ProjectDetail() {
 
   const canChangeStatus = (task) =>
     isProjectAdmin ||
-    task.createdBy._id === user._id ||
     (task.assignedTo && task.assignedTo._id === user._id);
 
-  const canEditTask = (task) =>
-    isProjectAdmin || task.createdBy._id === user._id;
+  const canEditTask = () => canDeleteTask;
 
   return (
     <div className="page">
@@ -183,8 +194,16 @@ export default function ProjectDetail() {
           <div className="project-info-row">
             <span className={`badge badge-${project.status.toLowerCase()}`}>{project.status}</span>
             <span className="muted">Owner: {project.owner.name}</span>
+            {isGlobalAdmin && !memberRecord && (
+              <span className="badge badge-owner">Global Admin view</span>
+            )}
           </div>
         </div>
+        {canDeleteProject && (
+          <button className="btn btn-danger" onClick={handleDeleteProject}>
+            Delete Project
+          </button>
+        )}
       </div>
 
       <div className="tabs">
@@ -287,7 +306,7 @@ export default function ProjectDetail() {
                         task={t}
                         onStatusChange={updateStatus}
                         onDelete={deleteTask}
-                        canEdit={canEditTask(t)}
+                        canEdit={canEditTask()}
                         canChangeStatus={canChangeStatus(t)}
                         draggable={canChangeStatus(t)}
                         onDragStart={handleDragStart(t._id)}

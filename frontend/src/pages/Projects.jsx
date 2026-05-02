@@ -97,6 +97,8 @@ export default function Projects() {
         <div className="projects-grid">
           {projects.map((p) => {
             const isOwner = p.owner._id === user._id;
+            const isGlobalAdmin = user.role === 'Admin';
+            const canDelete = isOwner || isGlobalAdmin;
             const completion = p.taskCount ? Math.round((p.completedCount / p.taskCount) * 100) : 0;
             return (
               <div key={p._id} className="project-card">
@@ -119,7 +121,7 @@ export default function Projects() {
                 </div>
                 <div className="project-actions">
                   <Link to={`/projects/${p._id}`} className="btn btn-secondary btn-sm">Open</Link>
-                  {isOwner && (
+                  {canDelete && (
                     <button className="btn btn-danger btn-sm" onClick={() => remove(p._id)}>
                       Delete
                     </button>

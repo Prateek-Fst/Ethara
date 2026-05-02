@@ -101,10 +101,10 @@ export default function Tasks() {
       ) : (
         <div className="tasks-list">
           {tasks.map((t) => {
+            const isGlobalAdmin = user.role === 'Admin';
             const canChangeStatus =
-              (t.assignedTo && t.assignedTo._id === user._id) ||
-              t.createdBy._id === user._id;
-            const canEdit = t.createdBy._id === user._id;
+              isGlobalAdmin || (t.assignedTo && t.assignedTo._id === user._id);
+            const canEdit = isGlobalAdmin;
             return (
               <TaskCard
                 key={t._id}

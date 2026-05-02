@@ -29,7 +29,13 @@ export default function Navbar() {
           <div className="avatar">{user.name.charAt(0).toUpperCase()}</div>
           <div className="user-info">
             <div className="user-name">{user.name}</div>
-            <div className="user-role">{user.role}</div>
+            <div className="user-role">
+              {user.role === 'Admin' ? (
+                <span className="role-badge role-admin">Global Admin</span>
+              ) : (
+                'Member'
+              )}
+            </div>
           </div>
           <button className="btn btn-ghost" onClick={handleLogout}>Logout</button>
         </div>

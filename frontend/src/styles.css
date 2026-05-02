@@ -123,6 +123,19 @@ a:hover { text-decoration: underline; }
 .user-info { display: flex; flex-direction: column; line-height: 1.2; }
 .user-name { font-weight: 600; font-size: 14px; }
 .user-role { font-size: 11px; color: var(--text-muted); }
+.role-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+.role-admin {
+  background: linear-gradient(135deg, var(--primary), var(--purple));
+  color: white;
+}
 
 /* ====== Buttons ====== */
 .btn {

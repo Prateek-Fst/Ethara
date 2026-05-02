@@ -26,9 +26,12 @@ exports.createProject = async (req, res) => {
 
 exports.getProjects = async (req, res) => {
   try {
-    const projects = await Project.find({
-      $or: [{ owner: req.user._id }, { 'members.user': req.user._id }]
-    })
+    const isGlobalAdmin = req.user.role === 'Admin';
+    const filter = isGlobalAdmin
+      ? {}
+      : { $or: [{ owner: req.user._id }, { 'members.user': req.user._id }] };
+
+    const projects = await Project.find(filter)
       .populate('owner', 'name email')
       .populate('members.user', 'name email role')
       .sort({ createdAt: -1 });
@@ -52,7 +55,7 @@ exports.getProject = async (req, res) => {
       .populate('owner', 'name email')
       .populate('members.user', 'name email role');
     if (!project) return res.status(404).json({ message: 'Project not found' });
-    if (!project.isMember(req.user._id)) {
+    if (!project.canView(req.user)) {
       return res.status(403).json({ message: 'Not a project member' });
     }
     res.json({ project });
@@ -81,8 +84,10 @@ exports.updateProject = async (req, res) => {
 exports.deleteProject = async (req, res) => {
   try {
     const project = req.project;
-    if (project.owner.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: 'Only owner can delete project' });
+    if (!project.canDeleteProject(req.user)) {
+      return res.status(403).json({
+        message: 'Only the project owner or a global Admin can delete this project'
+      });
     }
     await Task.deleteMany({ project: project._id });
     await project.deleteOne();
@@ -118,7 +123,7 @@ exports.removeMember = async (req, res) => {
   try {
     const project = req.project;
     const { userId } = req.params;
-    if (project.owner.toString() === userId) {
+    if (project.isOwner(userId)) {
       return res.status(400).json({ message: 'Cannot remove project owner' });
     }
     project.members = project.members.filter((m) => m.user.toString() !== userId);
